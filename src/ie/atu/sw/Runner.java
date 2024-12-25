@@ -73,7 +73,7 @@ public class Runner {
 					scanner.nextLine(); 
 			        String filename = scanner.nextLine(); 
 					loading(); // Display loading message
-					Loader.loadWordEmbeddings(filename); // The file path is assumed to be relative to the current directory.
+					Loader.loadWordEmbeddingsConcurrently(filename); // The file path is assumed to be relative to the current directory.
 					fileSpecified_wordembeddings = Loader.checkFileSpecified(); //flag used to indicate whether file has been specified or not
 					if(fileSpecified_wordembeddings == true)
 					{

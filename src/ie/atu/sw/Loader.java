@@ -1,8 +1,10 @@
 package ie.atu.sw;
 
 import java.io.*;
-import java.util.concurrent.ExecutorService;
+import java.nio.file.*;
+import java.util.concurrent.*;
 import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -51,6 +53,24 @@ public class Loader {
 		
     }
 	
+	public static void loadWordEmbeddingsConcurrently(String filePath) throws IOException {
+	    Path path = Paths.get(filePath);
+	    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+	        Files.lines(path).forEach(line -> 
+	            executor.submit(() -> {
+	                String[] parts = line.split(", ");
+	                String word = parts[0];
+	                double[] embedding = new double[parts.length - 1];
+	                for (int i = 1; i < parts.length; i++) {
+	                    embedding[i - 1] = Double.parseDouble(parts[i]);
+	                }
+	                wordEmbeddings.put(word, embedding);
+	                filespecified = true;
+	            }));
+	    } // The executor is automatically closed here, ensuring all tasks are completed.
+	}
+
+	
 	//To indicate whether file has been specified or not
 	public static boolean checkFileSpecified()
 	{
@@ -59,29 +79,27 @@ public class Loader {
 	}
 	
 	public static void loadGoogle1000Words(String filePath) {
-		
-        System.out.println("Loading Google-1000 words and their embeddings from: " + filePath);
+	    System.out.println("Loading Google-1000 words and their embeddings from: " + filePath);
 
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            String word;
-
-            while ((word = br.readLine()) != null) {
-                word = word.trim().toLowerCase();; // Remove any extra spaces
-                double[] embedding = wordEmbeddings.get(word); // Get the embedding
-                if (embedding != null) {
-                    google1000Embeddings.put(word, embedding); // Add to the ConcurrentHashMap
-                } else {
-                    System.out.println("No embedding found for Google-1000 word: " + word);
-                }
-            }
-            googlefilespecified = true;
-
-            System.out.println("Google-1000 words loaded successfully. Total size: " + google1000Embeddings.size());
-        } catch (IOException e) {
-            System.err.println("Error loading Google-1000 words: " + e.getMessage());
-        }
-		
-    }
+	    // Using a virtual thread-per-task executor
+	    try (var executor = Executors.newVirtualThreadPerTaskExecutor();
+	         Stream<String> lines = Files.lines(Paths.get(filePath))) {
+	        
+	        lines.forEach(line -> executor.submit(() -> {
+	            String word = line.trim().toLowerCase(); // Normalize the word
+	            double[] embedding = wordEmbeddings.get(word); // Attempt to get the embedding from loaded wordEmbeddings
+	            if (embedding != null) {
+	                google1000Embeddings.put(word, embedding); // Add the word and its embedding to the concurrent map
+	            } else {
+	                System.out.println("No embedding found for Google-1000 word: " + word);
+	            }
+	        }));
+	    } catch (IOException e) {
+	        System.err.println("Error loading Google-1000 words: " + e.getMessage());
+	    }
+	    googlefilespecified = true;
+	    System.out.println("Google-1000 words loaded successfully. Total size: " + google1000Embeddings.size());
+	}
 	
 	//To indicate whether google 1000 file has been specified or not
 	public static boolean checkGoogleFileSpecified()
